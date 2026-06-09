@@ -27,7 +27,7 @@ hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
         redo_entry:SetNiceName(entities[1]:GetClass())
     else
         if undo.NiceText and string.find(undo.NiceText, '#undo.duplication') then
-            redo_entry:SetNiceName('undo.duplication')
+            redo_entry:SetName('undo.duplication')
         end
     end
 
@@ -44,7 +44,7 @@ hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
     local nice_name = redo_entry:GetNiceName()
     local owner = redo_entry:GetOwner()
 
-    undo.Create(nice_name)
+    undo.Create(redo_entry:GetName())
     undo.SetPlayer(owner)
     
     for k, ent in ipairs(redone_entities) do
@@ -54,6 +54,7 @@ hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
     undo.Finish(nice_name)
 
     net.Start('Redo.SendRedoMessage')
+    net.WriteString(redo_entry:GetName())
     net.WriteString(nice_name)
     net.Send(owner)
 end)
