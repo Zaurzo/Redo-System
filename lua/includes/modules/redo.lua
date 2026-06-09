@@ -201,10 +201,6 @@ function redo.Create(name)
 end
 
 function redo.Finish(entry)
-    if not entry:IsPrepared() then
-        return error('cannot finish an unprepared redo entry')
-    end
-
     local owner = entry:GetOwner()
 
     if not IsValid(owner) or not owner:IsPlayer() then
