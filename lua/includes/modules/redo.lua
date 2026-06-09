@@ -1,4 +1,7 @@
 
+local Entity = Entity
+local istable, isentity, type = istable, isentity, type
+
 redo = {}
 
 local RedoEntry = {}
@@ -104,6 +107,21 @@ function RedoEntry:Paste()
             end
         end
     end
+    
+    for index, ent in pairs(entities) do
+        local tab = data.entities[index]
+
+        if tab.PhysicsObjects then
+            for phys_num, phys_data in pairs(tab.PhysicsObjects) do
+                local phys = ent:GetPhysicsObjectNum(phys_num)
+
+                if IsValid(phys) then
+                    phys:SetVelocity(phys_data.Velocity)
+                    phys:SetAngleVelocity(phys_data.AngleVelocity)
+                end
+            end
+        end
+    end
 
     local redone_entities = {}
 
@@ -128,6 +146,20 @@ function RedoEntry:Prepare()
 
             table.Merge(data.entities, copy.Entities)
             table.Merge(data.constraints, copy.Constraints)
+        end
+    end
+
+    for index, tab in pairs(data.entities) do
+        local ent = Entity(index)
+        local phys_objs = tab.PhysicsObjects or {}
+
+        for i = 0, ent:GetPhysicsObjectCount() - 1 do
+            local phys = ent:GetPhysicsObjectNum(i)
+
+            if phys and phys:IsValid() then
+                phys_objs[i].Velocity = phys:GetVelocity()
+                phys_objs[i].AngleVelocity = phys:GetAngleVelocity()
+            end
         end
     end
 
@@ -169,10 +201,14 @@ function redo.Create(name)
 end
 
 function redo.Finish(entry)
+    if not entry:IsPrepared() then
+        return error('cannot finish an unprepared redo entry')
+    end
+
     local owner = entry:GetOwner()
 
     if not IsValid(owner) or not owner:IsPlayer() then
-        return error('cannot finish redo without a player owner') 
+        return error('cannot finish redo entry without a player owner') 
     end
 
     local stack = redo_stacks[owner]
