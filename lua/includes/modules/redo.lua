@@ -29,12 +29,31 @@ local function clear_locomotion(tab)
     end
 end
 
+local function force_copy(ent)
+    local do_not_duplicate = ent.DoNotDuplicate
+    local allowed = duplicator.IsAllowed(ent)
+
+    ent.DoNotDuplicate = false
+
+    duplicator.Allow(ent)
+
+    local copy = duplicator.Copy(ent)
+
+    if not allowed then
+        duplicator.Disallow(ent)
+    end
+
+    ent.DoNotDuplicate = do_not_duplicate
+
+    return copy
+end
+
 function RedoEntry:AddEntity(ent)
-    local tab = duplicator.Copy(ent)
+    local copy = force_copy(ent)
     local data = self:GetCreateData()
 
-    table.Merge(data.entities, tab.Entities)
-    table.Merge(data.constraints, tab.Constraints)
+    table.Merge(data.entities, copy.Entities)
+    table.Merge(data.constraints, copy.Constraints)
 
     if ent:IsConstraint() then
         data.constraint = get_constraint_data(ent)
