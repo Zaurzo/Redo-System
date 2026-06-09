@@ -48,26 +48,6 @@ local function force_copy(ent)
     return copy
 end
 
-function RedoEntry:AddEntity(ent)
-    local copy = force_copy(ent)
-    local data = self:GetCreateData()
-
-    table.Merge(data.entities, copy.Entities)
-    table.Merge(data.constraints, copy.Constraints)
-
-    if ent:IsConstraint() then
-        data.constraint = get_constraint_data(ent)
-    end
-
-    for _, ent_data in pairs(data.entities) do
-        clear_locomotion(ent_data)
-    end
-end
-
-function RedoEntry:GetCreateData()
-    return self.create_data
-end
-
 function RedoEntry:Paste()
     DisablePropCreateEffect = true
 
@@ -82,11 +62,11 @@ function RedoEntry:Paste()
 
     DisablePropCreateEffect = false
 
-    if data.constraint then
+    for k, const_data in pairs(data.single_constraints) do
         local constrained_entities = {}
 
         for i = 1, 6 do
-            local ent = data.constraint['Ent' .. i]
+            local ent = const_data['Ent' .. i]
 
             if IsValid(ent) then
                 constrained_entities[ent:EntIndex()] = ent
@@ -94,7 +74,7 @@ function RedoEntry:Paste()
         end
 
         local consts = { duplicator.CreateConstraintFromTable(
-            data.constraint,
+            const_data,
             constrained_entities,
             owner
         ) }
@@ -114,15 +94,52 @@ function RedoEntry:Paste()
     return redone_entities
 end
 
+function RedoEntry:Prepare()
+    if self:IsPrepared() then return end
+
+    local data = self:GetCreateData()
+
+    for ent in pairs(self.entities_to_copy) do
+        if ent:IsConstraint() then
+            data.single_constraints[ent:GetCreationID()] = get_constraint_data(ent)
+        end
+
+        if not data.entities[ent:EntIndex()] then
+            local copy = force_copy(ent)
+
+            table.Merge(data.entities, copy.Entities)
+            table.Merge(data.constraints, copy.Constraints)
+        end
+    end
+
+    self.is_prepared = true
+end
+
+function RedoEntry:AddEntity(ent)
+    self.entities_to_copy[ent] = true
+end
+
+function RedoEntry:GetCreateData()
+    return self.create_data
+end
+
+function RedoEntry:IsPrepared()
+    return self.is_prepared
+end
+
 local redo_stacks = {}
 
 function redo.Create(name)
     local entry = {}
 
+    entry.entities_to_copy = {}
     entry.create_data = {
         entities = {},
-        constraints = {}
+        constraints = {},
+        single_constraints = {}
     }
+
+    entry.is_prepared = false
 
     setmetatable(entry, RedoEntry)
 
@@ -146,6 +163,7 @@ function redo.Finish(entry)
         redo_stacks[owner] = stack
     end
 
+    entry:Prepare()
     stack:Push(entry)
 end
 
