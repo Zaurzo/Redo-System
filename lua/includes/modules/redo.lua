@@ -150,6 +150,9 @@ function redo.Finish(entry)
 end
 
 hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
+    local entities = undo.Entities
+    if #entities < 1 or not IsTableOfEntitiesValid(entities) then return end
+
     local redo_entry = redo.Create(undo.Name)
     redo_entry:SetOwner(undo.Owner)
 
@@ -157,7 +160,7 @@ hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
         redo_entry:SetNiceName(undo.NiceName)
     end
 
-    for k, ent in ipairs(undo.Entities) do
+    for k, ent in ipairs(entities) do
         if IsValid(ent) then
             redo_entry:AddEntity(ent)
         end
