@@ -18,7 +18,11 @@ end
 net.Receive('Redo.SendRedoMessage', function()
     local name = net.ReadString()
     local nice_name = net.ReadString()
-    local text = 'Redone "' .. resolve_name(name, nice_name) .. '"'
+    
+    local text = string.format(
+        language.GetPhrase('hint.redoneX'),
+        resolve_name(name, nice_name)
+    )
     
     notification.Add(text, 5, icon_path)
 
