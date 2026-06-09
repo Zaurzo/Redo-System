@@ -68,11 +68,11 @@ local function filter_out_invalid_objects(tab, done)
     end
 end
 
-function RedoEntry:Paste()
+function RedoEntry:Perform()
     if not self:IsPrepared() then
         return error('cannot perform unprepared redo')
     end
-    
+
     local data = self:GetCreateData()
     local owner = self:GetOwner()
 

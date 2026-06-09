@@ -65,7 +65,7 @@ local function CC_Redo(ply)
     local redo_entry = stack:Top()
     if hook.Run('PreRedo', redo_entry) == false then return end
 
-    local redone_entities = stack:Pop():Paste()
+    local redone_entities = stack:Pop():Perform()
 
     hook.Run('PostRedo', redo_entry, redone_entities)
 end
