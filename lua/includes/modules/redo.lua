@@ -19,16 +19,6 @@ local function get_constraint_data(const)
     end
 end
 
--- Saving NextBot locomotion usually leads to problems/errors
--- so we just clear any of it
-local function clear_locomotion(tab)
-    for k, v in pairs(tab) do
-        if type(v) == 'CLuaLocomotion' then
-            ent_data[k] = nil
-        end
-    end
-end
-
 local function force_copy(ent)
     local do_not_duplicate = ent.DoNotDuplicate
     local allowed = duplicator.IsAllowed(ent)
@@ -48,11 +38,41 @@ local function force_copy(ent)
     return copy
 end
 
-function RedoEntry:Paste()
-    DisablePropCreateEffect = true
+local filter = {
+    ['Entity'] = true,
+    ['PhysObj'] = true,
+    ['CLuaLocomotion'] = true
+}
 
+local function filter_out_invalid_objects(tab, done)
+    for k, v in pairs(tab) do
+        if isentity(v) or filter[ type(v) ] then
+            if not IsValid(v) then
+                tab[k] = nil
+            end
+            
+            continue
+        end
+
+        if istable(v) then
+            done = done or {}
+
+            if not done[v] then
+                done[v] = true
+
+                filter_out_invalid_objects(v, done)
+            end
+        end
+    end
+end
+
+function RedoEntry:Paste()
     local data = self:GetCreateData()
     local owner = self:GetOwner()
+
+    DisablePropCreateEffect = true
+
+    filter_out_invalid_objects(data)
     
     local entities, constraints = duplicator.Paste(
         owner, 
