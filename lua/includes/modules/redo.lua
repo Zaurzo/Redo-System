@@ -39,7 +39,6 @@ local function force_copy(ent)
 end
 
 local filter = {
-    ['Entity'] = true,
     ['PhysObj'] = true,
     ['CLuaLocomotion'] = true
 }

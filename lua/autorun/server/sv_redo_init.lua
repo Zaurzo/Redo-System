@@ -4,9 +4,21 @@ util.AddNetworkString('Redo.SendRedoMessage')
 
 require('redo')
 
+local function get_valid_entities(entities)
+    local valid_entities = {}
+
+    for k, ent in ipairs(entities) do
+        if IsValid(ent) then
+            table.insert(valid_entities, ent)
+        end
+    end
+
+    return valid_entities
+end
+
 hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
-    local entities = undo.Entities
-    if #entities < 1 or not IsTableOfEntitiesValid(entities) then return end
+    local entities = get_valid_entities(undo.Entities)
+    if #entities < 1 then return end
 
     local redo_entry = redo.Create(undo.Name)
     redo_entry:SetOwner(undo.Owner)
