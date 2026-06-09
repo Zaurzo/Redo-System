@@ -23,8 +23,12 @@ hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
     local redo_entry = redo.Create(undo.Name)
     redo_entry:SetOwner(undo.Owner)
 
-    if undo.NiceName then
-        redo_entry:SetNiceName(undo.NiceName)
+    if #entities == 1 then
+        redo_entry:SetNiceName(entities[1]:GetClass())
+    else
+        if undo.NiceText and string.find(undo.NiceText, '#undo.duplication') then
+            redo_entry:SetNiceName('undo.duplication')
+        end
     end
 
     for k, ent in ipairs(entities) do
@@ -40,7 +44,7 @@ hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
     local nice_name = redo_entry:GetNiceName()
     local owner = redo_entry:GetOwner()
 
-    undo.Create(redo_entry:GetName())
+    undo.Create(nice_name)
     undo.SetPlayer(owner)
     
     for k, ent in ipairs(redone_entities) do
