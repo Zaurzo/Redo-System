@@ -42,9 +42,10 @@ end)
 
 hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
     local nice_name = redo_entry:GetNiceName()
+    local name = redo_entry:GetName()
     local owner = redo_entry:GetOwner()
 
-    undo.Create(redo_entry:GetName())
+    undo.Create(name)
     undo.SetPlayer(owner)
     
     for k, ent in ipairs(redone_entities) do
@@ -54,7 +55,7 @@ hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
     undo.Finish(nice_name)
 
     net.Start('Redo.SendRedoMessage')
-    net.WriteString(redo_entry:GetName())
+    net.WriteString(name)
     net.WriteString(nice_name)
     net.Send(owner)
 end)

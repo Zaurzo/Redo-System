@@ -46,25 +46,29 @@ local filter = {
     ['CLuaLocomotion'] = true
 }
 
-local function filter_out_invalid_objects(tab, done)
+local function decide(tab, decider, done)
     for k, v in pairs(tab) do
-        if isentity(v) or filter[ type(v) ] then
-            if not IsValid(v) then
-                tab[k] = nil
-            end
-            
-            continue
-        end
-
         if istable(v) then
             done = done or {}
 
             if not done[v] then
                 done[v] = true
 
-                filter_out_invalid_objects(v, done)
+                decide(v, decider, done)
+            end
+        else
+            local status, value = decider(v)
+
+            if status then
+                tab[k] = value
             end
         end
+    end
+end
+
+local function filter_out_invalid_objects(value)
+    if isentity(value) or filter[ type(value) ] then
+        return not IsValid(value), nil
     end
 end
 
@@ -78,7 +82,7 @@ function RedoEntry:Perform()
 
     DisablePropCreateEffect = true
 
-    filter_out_invalid_objects(data)
+    decide(data, filter_out_invalid_objects)
     
     local entities, constraints = duplicator.Paste(
         owner, 
@@ -90,12 +94,30 @@ function RedoEntry:Perform()
 
     for k, const_data in pairs(data.single_constraints) do
         local constrained_entities = {}
+        local null_entities
 
         for i = 1, 6 do
             local ent = const_data['Ent' .. i]
 
             if IsValid(ent) then
                 constrained_entities[ent:EntIndex()] = ent
+            elseif const_data.Entity[i] then
+                null_entities = null_entities or {}
+                null_entities[const_data.Entity[i].Index] = i
+            end
+        end
+
+        if null_entities then
+            for k, ent in ents.Iterator() do
+                local index = ent.Redo_RestoredIndex
+                local num = null_entities[index]
+
+                if index and num then
+                    index = ent:EntIndex()
+                    
+                    const_data.Entity[num].Index = index
+                    constrained_entities[index] = ent
+                end
             end
         end
 
@@ -113,6 +135,8 @@ function RedoEntry:Perform()
     end
     
     for index, ent in pairs(entities) do
+        ent.Redo_RestoredIndex = index
+
         local tab = data.entities[index]
 
         if tab.PhysicsObjects then
