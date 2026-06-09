@@ -167,35 +167,6 @@ function redo.Finish(entry)
     stack:Push(entry)
 end
 
-hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
-    local entities = undo.Entities
-    if #entities < 1 or not IsTableOfEntitiesValid(entities) then return end
-
-    local redo_entry = redo.Create(undo.Name)
-    redo_entry:SetOwner(undo.Owner)
-
-    if undo.NiceName then
-        redo_entry:SetNiceName(undo.NiceName)
-    end
-
-    for k, ent in ipairs(entities) do
-        if IsValid(ent) then
-            redo_entry:AddEntity(ent)
-        end
-    end
-
-    redo.Finish(redo_entry)
-end)
-
-concommand.Add('redo', function(ply)
-    local stack = redo_stacks[ply]
-    if not stack then return end
-
-    local redo_entry = stack:Top()
-
-    if redo_entry and hook.Run('PreRedo', redo_entry) ~= false then
-        local redone_entities = stack:Pop():Paste()
-
-        hook.Run('PostRedo', redo_entry, redone_entities)
-    end
-end)
+function redo.GetStack(ply)
+    return redo_stacks[ply]
+end
