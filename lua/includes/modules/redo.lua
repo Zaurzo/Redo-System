@@ -50,11 +50,7 @@ function RedoEntry:Perform()
 
     DisablePropCreateEffect = true
     
-    local entities, constraints = duplicator.Paste(
-        owner, 
-        data.Entities, 
-        {}
-    )
+    local entities, constraints = duplicator.Paste(owner, data.Entities, {})
 
     DisablePropCreateEffect = false
 
