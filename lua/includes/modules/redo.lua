@@ -3,7 +3,7 @@ redo = {}
 
 local Entity = Entity
 local istable, isentity, type = istable, isentity, type
-local linq, duplicator, constraint = include('redo/util.lua')
+local linq, duplicator, constraint, misc = include('redo/util.lua')
 
 local RedoEntry = {}
 RedoEntry.__index = RedoEntry
@@ -153,9 +153,7 @@ function RedoEntry:Prepare()
     for ent in pairs(self.entities_to_copy) do
         if constraint.IsConstraint(ent) then
             data.Constraints[ent:GetCreationID()] = duplicator.CopyConstraint(ent)
-        end
-
-        if not data.Entities[ent:EntIndex()] then
+        elseif not data.Entities[ent:EntIndex()] then
             duplicator.ForceCopy(ent, data)
         end
     end
