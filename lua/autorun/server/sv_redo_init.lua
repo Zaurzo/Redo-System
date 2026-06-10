@@ -59,6 +59,8 @@ hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
     if #entities < 1 then return end
 
     local redo_entry = redo.Create(undo.Name)
+
+    redo_entry:SetUndoTable(undo)
     redo_entry:SetOwner(undo.Owner)
 
     if #entities == 1 then
@@ -88,6 +90,14 @@ hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
     
     for k, ent in ipairs(redone_entities) do
         undo.AddEntity(ent)
+    end
+
+    local undo_table = redo_entry:GetUndoTable()
+
+    if undo_table then
+        if undo_table.CustomUndoText then
+            undo.SetCustomUndoText(undo_table.CustomUndoText)
+        end
     end
 
     undo.Finish(nice_name)

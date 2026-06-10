@@ -11,6 +11,7 @@ RedoEntry.__index = RedoEntry
 AccessorFunc(RedoEntry, 'player_owner', 'Owner')
 AccessorFunc(RedoEntry, 'name', 'Name', FORCE_STRING)
 AccessorFunc(RedoEntry, 'nice_name', 'NiceName', FORCE_STRING)
+AccessorFunc(RedoEntry, 'undo_table', 'UndoTable')
 
 local filter = {
     ['PhysObj'] = true,
