@@ -53,23 +53,17 @@ function RedoEntry:Perform()
     local entities, constraints = duplicator.Paste(
         owner, 
         data.Entities, 
-        data.Constraints
+        {}
     )
 
     DisablePropCreateEffect = false
 
-    local missing_constraints = {}
-
-    for id, const_data in pairs(data.Constraints) do
-        if not constraints[id] then
-            missing_constraints[id] = const_data
-        end
-    end
-
     local restored = get_restored_entities()
 
-    -- Restore the rest of the constraints
-    for _, const_data in pairs(missing_constraints) do
+    -- Restore constraints
+    -- We do it manually as the constraints given by duplicator.Paste
+    -- aren't mapped by their original creation ID.
+    for _, const_data in pairs(data.Constraints) do
         local constrained_entities = {}
         local ent_data = const_data.Entity
 
@@ -146,6 +140,8 @@ function RedoEntry:Prepare()
         end
     end
 
+    --PrintTable(table.GetKeys(data.Constraints))
+
     local id_to_entity = {}
 
     for index, tab in pairs(data.Entities) do
@@ -165,6 +161,9 @@ function RedoEntry:Prepare()
     end
 
     for id, tab in pairs(data.Constraints) do
+        tab.Redo_RestoreID = tostring({})
+        print(id, tab.Redo_RestoreID)
+
         for i = 1, 6 do
             if tab.Entity[i] then
                 local ent = tab.Entity[i].Entity
