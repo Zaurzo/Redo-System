@@ -1,8 +1,9 @@
 
+redo = {}
+
 local Entity = Entity
 local istable, isentity, type = istable, isentity, type
-
-redo = {}
+local linq, duplicator, constraint = include('redo/util.lua')
 
 local RedoEntry = {}
 RedoEntry.__index = RedoEntry
@@ -11,65 +12,29 @@ AccessorFunc(RedoEntry, 'player_owner', 'Owner')
 AccessorFunc(RedoEntry, 'name', 'Name', FORCE_STRING)
 AccessorFunc(RedoEntry, 'nice_name', 'NiceName', FORCE_STRING)
 
-local function get_constraint_data(const)
-    local constraints = constraint.GetTable(const.Ent1)
-    if not constraints then return end
-
-    for k, const_data in ipairs(constraints) do
-        if const_data.Constraint == const then
-            return const_data
-        end
-    end
-end
-
-local function force_copy(ent)
-    local do_not_duplicate = ent.DoNotDuplicate
-    local allowed = duplicator.IsAllowed(ent)
-
-    ent.DoNotDuplicate = false
-
-    duplicator.Allow(ent)
-
-    local copy = duplicator.Copy(ent)
-
-    if not allowed then
-        duplicator.Disallow(ent)
-    end
-
-    ent.DoNotDuplicate = do_not_duplicate
-
-    return copy
-end
-
 local filter = {
     ['PhysObj'] = true,
     ['CLuaLocomotion'] = true
 }
 
-local function decide(tab, decider, done)
-    for k, v in pairs(tab) do
-        if istable(v) then
-            done = done or {}
-
-            if not done[v] then
-                done[v] = true
-
-                decide(v, decider, done)
-            end
-        else
-            local status, value = decider(v)
-
-            if status then
-                tab[k] = value
-            end
-        end
+local function filter_out_invalid_objects(_, v)
+    if isentity(v) or filter[ type(v) ] then
+        return not IsValid(v), nil
     end
 end
 
-local function filter_out_invalid_objects(value)
-    if isentity(value) or filter[ type(value) ] then
-        return not IsValid(value), nil
+local function get_restored_entities()
+    local restored = {}
+
+    for k, ent in ents.Iterator() do
+        local index = ent.Redo_RestoreID
+
+        if index then
+            restored[index] = ent
+        end
     end
+
+    return restored
 end
 
 function RedoEntry:Perform()
@@ -80,42 +45,64 @@ function RedoEntry:Perform()
     local data = self:GetCreateData()
     local owner = self:GetOwner()
 
-    DisablePropCreateEffect = true
+    -- Clear the data of any invalid/NULL objects
+    linq.MapRecursive(data, filter_out_invalid_objects)
 
-    decide(data, filter_out_invalid_objects)
+    local stored_entities = duplicator.GetAllStoredEntities(data)
+    local restored = get_restored_entities()
+
+    -- Clear the copy data of any entity that already exists
+    linq.Map(data.Entities, function(k, v)
+        local restored_id = v.Redo_RestoreID
+
+        if restored_id and restored[restored_id] then
+            return true, nil
+        end
+
+        return stored_entities[k], nil
+    end)
+
+    DisablePropCreateEffect = true
     
     local entities, constraints = duplicator.Paste(
         owner, 
-        data.entities, 
-        data.constraints
+        data.Entities, 
+        data.Constraints
     )
 
     DisablePropCreateEffect = false
 
-    for k, const_data in pairs(data.single_constraints) do
+    local missing_constraints = {}
+
+    for id, const_data in pairs(data.Constraints) do
+        if not constraints[id] then
+            missing_constraints[id] = const_data
+        end
+    end
+
+    -- Restore the rest of the constraints
+    for _, const_data in pairs(missing_constraints) do
         local constrained_entities = {}
-        local null_entities
+        local ent_data = const_data.Entity
 
         for i = 1, 6 do
             local ent = const_data['Ent' .. i]
 
             if IsValid(ent) then
                 constrained_entities[ent:EntIndex()] = ent
-            elseif const_data.Entity[i] then
-                null_entities = null_entities or {}
-                null_entities[const_data.Entity[i].Index] = i
-            end
-        end
+            elseif ent_data[i] then
+                local index = ent_data[i].Index
 
-        if null_entities then
-            for k, ent in ents.Iterator() do
-                local index = ent.Redo_RestoredIndex
-                local num = null_entities[index]
+                -- Fixup constraint copy data to use restored entities
+                ent = entities[index]
 
-                if index and num then
-                    index = ent:EntIndex()
-                    
-                    const_data.Entity[num].Index = index
+                if not ent then
+                    local restore_id = ent_data[i].Redo_RestoreID
+                    ent = restore_id and restored[restore_id] or nil
+                end
+
+                if ent then
+                    ent_data[i].Entity = ent
                     constrained_entities[index] = ent
                 end
             end
@@ -135,9 +122,8 @@ function RedoEntry:Perform()
     end
     
     for index, ent in pairs(entities) do
-        ent.Redo_RestoredIndex = index
-
-        local tab = data.entities[index]
+        local tab = data.Entities[index]
+        ent.Redo_RestoreID = tab.Redo_RestoreID
 
         if tab.PhysicsObjects then
             for phys_num, phys_data in pairs(tab.PhysicsObjects) do
@@ -165,19 +151,16 @@ function RedoEntry:Prepare()
     local data = self:GetCreateData()
 
     for ent in pairs(self.entities_to_copy) do
-        if ent:IsConstraint() then
-            data.single_constraints[ent:GetCreationID()] = get_constraint_data(ent)
+        if constraint.IsConstraint(ent) then
+            data.Constraints[ent:GetCreationID()] = duplicator.CopyConstraint(ent)
         end
 
-        if not data.entities[ent:EntIndex()] then
-            local copy = force_copy(ent)
-
-            table.Merge(data.entities, copy.Entities)
-            table.Merge(data.constraints, copy.Constraints)
+        if not data.Entities[ent:EntIndex()] then
+            duplicator.ForceCopy(ent, data)
         end
     end
 
-    for index, tab in pairs(data.entities) do
+    for index, tab in pairs(data.Entities) do
         local ent = Entity(index)
         local phys_objs = tab.PhysicsObjects or {}
 
@@ -187,6 +170,22 @@ function RedoEntry:Prepare()
             if phys and phys:IsValid() then
                 phys_objs[i].Velocity = phys:GetVelocity()
                 phys_objs[i].AngleVelocity = phys:GetAngleVelocity()
+            end
+        end
+
+        ent.Redo_RestoreID = ent.Redo_RestoreID or {}
+        tab.Redo_RestoreID = ent.Redo_RestoreID
+    end
+
+    for id, tab in pairs(data.Constraints) do
+        local const_entity_data = tab.Entity
+
+        for i = 1, 6 do
+            if const_entity_data[i] then
+                local ent = const_entity_data[i].Entity
+                ent.Redo_RestoreID = ent.Redo_RestoreID or {}
+
+                const_entity_data[i].Redo_RestoreID = ent.Redo_RestoreID
             end
         end
     end
@@ -213,9 +212,9 @@ function redo.Create(name)
 
     entry.entities_to_copy = {}
     entry.create_data = {
-        entities = {},
-        constraints = {},
-        single_constraints = {}
+        Entities = {},
+        Constraints = {},
+        SingleConstraints = {}
     }
 
     entry.is_prepared = false
