@@ -4,10 +4,48 @@ util.AddNetworkString('Redo.SendRedoMessage')
 
 require('redo')
 
-local function get_valid_entities(entities)
+local m_Entity = FindMetaTable('Entity')
+local old_Remove = m_Entity.Remove
+
+local current_undo
+
+function m_Entity:Remove(...)
+    if current_undo then
+        local entities = current_undo.Redo_RemovedByFunction or {}
+        current_undo.Redo_RemovedByFunction = entities
+
+        table.insert(entities, self)
+    end
+
+    return old_Remove(self, ...)
+end
+
+hook.Add('PreUndo', 'Redo.GetEntitiesRemovedByFunction', function(undo)
+    if not undo.Functions then return end
+
+    for k, func in pairs(undo.Functions) do
+        local callback = func[1]
+
+        func[1] = function(...)
+            current_undo = undo
+
+            callback(...)
+
+            current_undo = nil
+        end
+    end
+end)
+
+local function get_valid_entities(undo)
     local valid_entities = {}
 
-    for k, ent in ipairs(entities) do
+    for k, ent in ipairs(undo.Entities) do
+        if IsValid(ent) then
+            table.insert(valid_entities, ent)
+        end
+    end
+
+    for k, ent in ipairs(undo.Redo_RemovedByFunction or {}) do
         if IsValid(ent) then
             table.insert(valid_entities, ent)
         end
@@ -17,7 +55,7 @@ local function get_valid_entities(entities)
 end
 
 hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
-    local entities = get_valid_entities(undo.Entities)
+    local entities = get_valid_entities(undo)
     if #entities < 1 then return end
 
     local redo_entry = redo.Create(undo.Name)

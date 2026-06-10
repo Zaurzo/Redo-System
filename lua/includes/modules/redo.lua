@@ -136,8 +136,6 @@ function RedoEntry:Prepare()
         end
     end
 
-    --PrintTable(table.GetKeys(data.Constraints))
-
     local id_to_entity = {}
 
     for index, tab in pairs(data.Entities) do
