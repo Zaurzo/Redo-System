@@ -113,4 +113,3 @@ local function CC_Redo(ply)
 end
 
 concommand.Add('redo', CC_Redo, nil, '', FCVAR_DONTRECORD)
-concommand.Add('gmod_redo', CC_Redo, nil, '', FCVAR_DONTRECORD)
