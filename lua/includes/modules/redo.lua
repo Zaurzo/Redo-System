@@ -165,8 +165,8 @@ function RedoEntry:Prepare()
         end
     end
 
-    -- Wait a little bit
-    timer.Simple(0.1, function()
+    -- Wait for entities to be removed
+    timer.Simple(0.05, function()
         -- Clear the data of any entity that still exists
         for index, ent in pairs(id_to_entity) do
             if IsValid(ent) then
