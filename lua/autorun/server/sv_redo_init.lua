@@ -65,6 +65,8 @@ local function CC_Redo(ply)
     if not stack or stack:Size() < 1 then return end
 
     local redo_entry = stack:Top()
+
+    if not redo_entry:IsPrepared() then return end
     if hook.Run('PreRedo', redo_entry) == false then return end
 
     local redone_entities = stack:Pop():Perform()

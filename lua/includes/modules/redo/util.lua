@@ -131,45 +131,4 @@ function constraint.IsConstraint(ent)
     return constraint_classes[ent:GetClass()]
 end
 
--- Misc
-
---[[local misc = {}
-
-local m_Entity = FindMetaTable('Entity')
-local old_Spawn = m_Entity.Spawn
-
-local spawn_stack = util.Stack()
-
-function m_Entity:Spawn(...)
-    spawn_stack:Push(self)
-
-    old_Spawn(self, ...)
-
-    spawn_stack:Pop()
-end
-
-local initializer_ents
-
-local function clear()
-    initializer_ents = nil
-end
-
-hook.Add('OnEntityCreated', 'Redo.Util', function(ent)
-    local root_ent = spawn_stack:Top()
-    if not root_ent then return end
-
-    initializer_ents = initializer_ents or {}
-
-    local list = initializer_ents[root_ent] or {}
-    table.insert(list, ent)
-
-    initializer_ents[root_ent] = list
-
-    timer.Create('RedoUtil.ClearInitializerEnts', 0, 1, clear)
-end)
-
-function misc.GetEntitiesCreatedFromInitializer(ent)
-    return initializer_ents and initializer_ents[ent] or nil
-end]]
-
-return linq, duplicator, constraint, misc
+return linq, duplicator, constraint

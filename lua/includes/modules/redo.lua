@@ -3,7 +3,7 @@ redo = {}
 
 local Entity = Entity
 local istable, isentity, type = istable, isentity, type
-local linq, duplicator, constraint, misc = include('redo/util.lua')
+local linq, duplicator, constraint = include('redo/util.lua')
 
 local RedoEntry = {}
 RedoEntry.__index = RedoEntry
@@ -48,20 +48,6 @@ function RedoEntry:Perform()
     -- Clear the data of any invalid/NULL objects
     linq.MapRecursive(data, filter_out_invalid_objects)
 
-    local stored_entities = duplicator.GetAllStoredEntities(data)
-    local restored = get_restored_entities()
-
-    -- Clear the copy data of any entity that already exists
-    linq.Map(data.Entities, function(k, v)
-        local restored_id = v.Redo_RestoreID
-
-        if restored_id and restored[restored_id] then
-            return true, nil
-        end
-
-        return stored_entities[k], nil
-    end)
-
     DisablePropCreateEffect = true
     
     local entities, constraints = duplicator.Paste(
@@ -79,6 +65,8 @@ function RedoEntry:Perform()
             missing_constraints[id] = const_data
         end
     end
+
+    local restored = get_restored_entities()
 
     -- Restore the rest of the constraints
     for _, const_data in pairs(missing_constraints) do
@@ -158,9 +146,13 @@ function RedoEntry:Prepare()
         end
     end
 
+    local id_to_entity = {}
+
     for index, tab in pairs(data.Entities) do
         local ent = Entity(index)
         local phys_objs = tab.PhysicsObjects or {}
+
+        id_to_entity[index] = ent
 
         for i = 0, ent:GetPhysicsObjectCount() - 1 do
             local phys = ent:GetPhysicsObjectNum(i)
@@ -170,25 +162,28 @@ function RedoEntry:Prepare()
                 phys_objs[i].AngleVelocity = phys:GetAngleVelocity()
             end
         end
-
-        ent.Redo_RestoreID = ent.Redo_RestoreID or {}
-        tab.Redo_RestoreID = ent.Redo_RestoreID
     end
 
     for id, tab in pairs(data.Constraints) do
-        local const_entity_data = tab.Entity
-
         for i = 1, 6 do
-            if const_entity_data[i] then
-                local ent = const_entity_data[i].Entity
-                ent.Redo_RestoreID = ent.Redo_RestoreID or {}
-
-                const_entity_data[i].Redo_RestoreID = ent.Redo_RestoreID
+            if tab.Entity[i] then
+                local ent = tab.Entity[i].Entity
+                tab.Entity[i].Redo_RestoreID = ent.Redo_RestoreID
             end
         end
     end
 
-    self.is_prepared = true
+    -- Wait a little bit
+    timer.Simple(0.1, function()
+        -- Clear the data of any entity that still exists
+        for index, ent in pairs(id_to_entity) do
+            if IsValid(ent) then
+                data.Entities[index] = nil
+            end
+        end
+
+        self.is_prepared = true
+    end)
 end
 
 function RedoEntry:AddEntity(ent)
@@ -246,3 +241,7 @@ end
 function redo.GetStack(ply)
     return redo_stacks[ply]
 end
+
+hook.Add('OnEntityCreated', 'Redo.SetRestoreID', function(ent)
+    ent.Redo_RestoreID = {}
+end)
