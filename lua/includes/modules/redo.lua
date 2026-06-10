@@ -161,9 +161,6 @@ function RedoEntry:Prepare()
     end
 
     for id, tab in pairs(data.Constraints) do
-        tab.Redo_RestoreID = tostring({})
-        print(id, tab.Redo_RestoreID)
-
         for i = 1, 6 do
             if tab.Entity[i] then
                 local ent = tab.Entity[i].Entity
