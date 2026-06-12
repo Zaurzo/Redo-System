@@ -137,21 +137,22 @@ function RedoEntry:Prepare()
         end
     end
 
-    local id_to_entity = {}
-
     for index, tab in pairs(data.Entities) do
         local ent = Entity(index)
-        local phys_objs = tab.PhysicsObjects or {}
 
-        id_to_entity[index] = ent
+        if self.entities_to_copy[ent] then
+            local phys_objs = tab.PhysicsObjects or {}
 
-        for i = 0, ent:GetPhysicsObjectCount() - 1 do
-            local phys = ent:GetPhysicsObjectNum(i)
+            for i = 0, ent:GetPhysicsObjectCount() - 1 do
+                local phys = ent:GetPhysicsObjectNum(i)
 
-            if phys and phys:IsValid() then
-                phys_objs[i].Velocity = phys:GetVelocity()
-                phys_objs[i].AngleVelocity = phys:GetAngleVelocity()
+                if phys and phys:IsValid() then
+                    phys_objs[i].Velocity = phys:GetVelocity()
+                    phys_objs[i].AngleVelocity = phys:GetAngleVelocity()
+                end
             end
+        else
+            data.Entities[index] = nil
         end
     end
 
@@ -164,17 +165,7 @@ function RedoEntry:Prepare()
         end
     end
 
-    -- Wait for entities to be removed
-    timer.Simple(0.05, function()
-        -- Clear the data of any entity that still exists
-        for index, ent in pairs(id_to_entity) do
-            if IsValid(ent) then
-                data.Entities[index] = nil
-            end
-        end
-
-        self.is_prepared = true
-    end)
+    self.is_prepared = true
 end
 
 function RedoEntry:AddEntity(ent)
