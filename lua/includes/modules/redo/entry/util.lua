@@ -9,6 +9,7 @@ local duplicator = duplicator
 local linq = {}
 
 function linq.Map(tbl, predicate)
+    
     for k, v in pairs(tbl) do
         local replace, replacement = predicate(k, v)
 
@@ -16,9 +17,11 @@ function linq.Map(tbl, predicate)
             tbl[k] = replacement
         end
     end
+
 end
 
 local function each_recursive(tbl, action, done)
+
     for k, v in pairs(tbl) do
         action(tbl, k, v)
 
@@ -34,6 +37,7 @@ local function each_recursive(tbl, action, done)
     end
 
     return tbl
+
 end
 
 function linq.EachRecursive(tbl, action)
@@ -41,6 +45,7 @@ function linq.EachRecursive(tbl, action)
 end
 
 function linq.MapRecursive(tbl, predicate)
+
     local function action(tbl, k, v)
         local replace, replacement = predicate(k, v)
 
@@ -50,9 +55,11 @@ function linq.MapRecursive(tbl, predicate)
     end
 
     return each_recursive(tbl, action)
+
 end
 
 function linq.WhereRecursive(tbl, predicate)
+
     local values, n = {}, 0
 
     local function action(_, v)
@@ -65,6 +72,7 @@ function linq.WhereRecursive(tbl, predicate)
     each_recursive(tbl, action)
 
     return values
+
 end
 
 -- Duplicator
@@ -72,6 +80,7 @@ end
 local duplicator = setmetatable({}, { __index = duplicator })
 
 function duplicator.ForceCopy(ent, output)
+
     local do_not_duplicate = ent.DoNotDuplicate
     local allowed = duplicator.IsAllowed(ent)
 
@@ -88,9 +97,11 @@ function duplicator.ForceCopy(ent, output)
     ent.DoNotDuplicate = do_not_duplicate
 
     return copy
+    
 end
 
 function duplicator.GetAllStoredEntities(data)
+
     local stored_entities = {}
 
     linq.EachRecursive(data, function(tbl, k, v)
@@ -100,9 +111,11 @@ function duplicator.GetAllStoredEntities(data)
     end)
 
     return stored_entities
+
 end
 
 function duplicator.CopyConstraint(const)
+
     local constraints = constraint.GetTable(const.Ent1)
     if not constraints then return end
 
@@ -111,6 +124,7 @@ function duplicator.CopyConstraint(const)
             return const_data
         end
     end
+
 end
 
 -- Constraint
@@ -124,11 +138,13 @@ local constraint_classes = {
 }
 
 function constraint.IsConstraint(ent)
+
     if ent:IsConstraint() then
         return true
     end
 
     return constraint_classes[ent:GetClass()]
+
 end
 
 return linq, duplicator, constraint

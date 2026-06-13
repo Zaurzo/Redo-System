@@ -1,15 +1,11 @@
 
-AddCSLuaFile('includes/modules/notification.extension.lua')
-util.AddNetworkString('Redo.SendRedoMessage')
-
-require('redo')
-
 local m_Entity = FindMetaTable('Entity')
 local old_Remove = m_Entity.Remove
 
 local current_undo
 
 function m_Entity:Remove(...)
+
     if current_undo then
         local entities = current_undo.Redo_RemovedByFunction or {}
         current_undo.Redo_RemovedByFunction = entities
@@ -18,9 +14,11 @@ function m_Entity:Remove(...)
     end
 
     return old_Remove(self, ...)
+
 end
 
 hook.Add('PreUndo', 'Redo.GetEntitiesRemovedByFunction', function(undo)
+
     if not undo.Functions then return end
 
     for k, func in pairs(undo.Functions) do
@@ -34,9 +32,11 @@ hook.Add('PreUndo', 'Redo.GetEntitiesRemovedByFunction', function(undo)
             current_undo = nil
         end
     end
+
 end)
 
 local function get_valid_entities(undo)
+
     local valid_entities = {}
 
     for k, ent in ipairs(undo.Entities) do
@@ -52,9 +52,11 @@ local function get_valid_entities(undo)
     end
 
     return valid_entities
+
 end
 
 hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
+
     local entities = get_valid_entities(undo)
     if #entities < 1 then return end
 
@@ -78,9 +80,11 @@ hook.Add('PostUndo', 'Redo.CreateRedo', function(undo)
     end
 
     redo.Finish(redo_entry)
+
 end)
 
 hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
+
     local nice_name = redo_entry:GetNiceName()
     local name = redo_entry:GetName()
     local owner = redo_entry:GetOwner()
@@ -102,24 +106,19 @@ hook.Add('PostRedo', 'PostRedo', function(redo_entry, redone_entities)
 
     undo.Finish(nice_name)
 
-    net.Start('Redo.SendRedoMessage')
-    net.WriteString(name)
-    net.WriteString(nice_name)
-    net.Send(owner)
 end)
 
 local function CC_Redo(ply)
-    local stack = redo.GetStack(ply)
-    if not stack or stack:Size() < 1 then return end
+    redo.Perform(ply)
+end
 
-    local redo_entry = stack:Top()
+local function CC_RedoNum(ply, cmd, args)
+    
+    local index = args[1] and tonumber( args[1] )
 
-    if not redo_entry:IsPrepared() then return end
-    if hook.Run('PreRedo', redo_entry) == false then return end
+    redo.Perform(ply, index or nil)
 
-    local redone_entities = stack:Pop():Perform()
-
-    hook.Run('PostRedo', redo_entry, redone_entities)
 end
 
 concommand.Add('redo', CC_Redo, nil, '', FCVAR_DONTRECORD)
+concommand.Add('redo_num', CC_RedoNum, nil, '', FCVAR_DONTRECORD)
