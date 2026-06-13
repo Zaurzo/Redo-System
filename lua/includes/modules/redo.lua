@@ -1,9 +1,13 @@
 
 redo = {}
 
+local tight_constraint_types = {}
+
 local Entity = Entity
 local istable, isentity, type = istable, isentity, type
 local linq, duplicator, constraint = include('redo/util.lua')
+
+local vector_zero, angle_zero = Vector(), Angle()
 
 local RedoEntry = {}
 RedoEntry.__index = RedoEntry
@@ -50,8 +54,13 @@ function RedoEntry:Perform()
     linq.MapRecursive(data, filter_out_invalid_objects)
 
     DisablePropCreateEffect = true
-    
+
+    duplicator.SetLocalPos(self.paste_pos)
+    duplicator.SetLocalAng(angle_zero)
+
     local entities, constraints = duplicator.Paste(owner, data.Entities, {})
+
+    duplicator.SetLocalPos(vector_zero)
 
     DisablePropCreateEffect = false
 
@@ -70,6 +79,8 @@ function RedoEntry:Perform()
             if IsValid(ent) then
                 constrained_entities[ent:EntIndex()] = ent
             elseif ent_data[i] then
+                ent_data[i].Removed = true
+
                 local index = ent_data[i].Index
 
                 -- Fixup constraint copy data to use restored entities
@@ -84,6 +95,41 @@ function RedoEntry:Perform()
                     ent_data[i].Entity = ent
                     constrained_entities[index] = ent
                 end
+            end
+        end
+
+        if tight_constraint_types[const_data.Type] then
+            local ent1, ent2 = const_data.Entity[1], const_data.Entity[2]
+
+            if ent1 and ent2 then
+                local parent_ent, child_ent
+
+                -- Choose best entity to change position and angle for
+                if ent1.Removed then
+                    parent_ent, child_ent = ent1, ent2
+                elseif ent2.Removed then
+                    parent_ent, child_ent = ent2, ent1
+                else
+                    parent_ent, child_ent = ent1, ent2
+
+                    local world_pos1 = ent1.Entity:GetPos()
+                    local world_pos2 = ent2.Entity:GetPos()
+                    local main_pos = self.paste_pos
+
+                    if world_pos1:DistToSqr(main_pos) <= world_pos2:DistToSqr(main_pos) then
+                        parent_ent, child_ent = ent2, ent1
+                    end
+                end
+
+                local pos1, ang1 = LocalToWorld(
+                    parent_ent.LocalPos,
+                    parent_ent.LocalAng,
+                    child_ent.Entity:GetPos(),
+                    child_ent.Entity:GetAngles()
+                )
+
+                parent_ent.Entity:SetPos(pos1)
+                parent_ent.Entity:SetAngles(ang1)
             end
         end
 
@@ -128,14 +174,26 @@ function RedoEntry:Prepare()
     if self:IsPrepared() then return end
 
     local data = self:GetCreateData()
+    local paste_pos
 
     for ent in pairs(self.entities_to_copy) do
+        if not paste_pos then
+            paste_pos = ent:GetPos()
+        end
+
         if constraint.IsConstraint(ent) then
             data.Constraints[ent:GetCreationID()] = duplicator.CopyConstraint(ent)
         elseif not data.Entities[ent:EntIndex()] then
+            duplicator.SetLocalPos(paste_pos)
+            duplicator.SetLocalAng(angle_zero)
+
             duplicator.ForceCopy(ent, data)
+
+            duplicator.SetLocalPos(vector_zero)
         end
     end
+
+    self.paste_pos = paste_pos
 
     for index, tab in pairs(data.Entities) do
         local ent = Entity(index)
@@ -158,10 +216,29 @@ function RedoEntry:Prepare()
 
     for id, tab in pairs(data.Constraints) do
         for i = 1, 6 do
-            if tab.Entity[i] then
-                local ent = tab.Entity[i].Entity
-                tab.Entity[i].Redo_RestoreID = ent.Redo_RestoreID
+            local ent_data = tab.Entity[i]
+
+            if ent_data then
+                ent_data.Redo_RestoreID = ent_data.Entity.Redo_RestoreID
             end
+        end
+
+        if tight_constraint_types[tab.Type] then
+            local ent1, ent2 = tab.Entity[1], tab.Entity[2]
+
+            ent1.LocalPos, ent1.LocalAng = WorldToLocal(
+                ent1.Entity:GetPos(),
+                ent1.Entity:GetAngles(),
+                ent2.Entity:GetPos(),
+                ent2.Entity:GetAngles()
+            )
+
+            ent2.LocalPos, ent2.LocalAng = WorldToLocal(
+                ent2.Entity:GetPos(),
+                ent2.Entity:GetAngles(),
+                ent1.Entity:GetPos(),
+                ent1.Entity:GetAngles()
+            )
         end
     end
 
@@ -223,6 +300,12 @@ end
 function redo.GetStack(ply)
     return redo_stacks[ply]
 end
+
+function redo.RegisterTightConstraint(const_type)
+    tight_constraint_types[const_type] = true
+end
+
+redo.RegisterTightConstraint('Weld')
 
 hook.Add('OnEntityCreated', 'Redo.SetRestoreID', function(ent)
     ent.Redo_RestoreID = {}
